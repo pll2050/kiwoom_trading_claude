@@ -111,13 +111,55 @@ class AutoTradingSystem:
         """계좌 상태 확인"""
         logger.info("=== 계좌 확인 ===")
         try:
+            # 테스트 모드: 가상 계좌 데이터 사용
+            if self.config['trading']['test_mode']:
+                logger.info("🧪 테스트 모드: 가상 계좌 데이터 사용")
+                initial_capital = self.config['trading']['initial_capital']
+
+                balance = {'entr': initial_capital}
+                info = {'prsm_dpst_aset_amt': initial_capital}
+                holdings = []
+
+                logger.info(f"예수금: {initial_capital:,}원 (가상)")
+                logger.info(f"총자산: {initial_capital:,}원 (가상)")
+                logger.info(f"보유종목: 0개")
+
+                # 현재 자본금 초기화
+                self.current_capital = initial_capital
+                return
+
+            # 실전 모드: 실제 API 호출
             balance = await self.api_client.get_balance()
             info = await self.api_client.get_account_info()
             holdings = await self.api_client.get_holdings()
 
-            logger.info(f"예수금: {balance.get('available_cash', 0):,}원")
-            logger.info(f"총자산: {info.get('total_asset', 0):,}원")
+            # 디버깅: 실제 응답 데이터 확인
+            logger.debug(f"Balance API 응답: {balance}")
+            logger.debug(f"Account Info API 응답: {info}")
+            logger.debug(f"Holdings API 응답: {holdings}")
+
+            # 여러 필드명 시도 (API 응답 구조가 다를 수 있음)
+            available_cash = (
+                balance.get('available_cash') or
+                balance.get('entr') or
+                balance.get('dnca_tot_amt') or
+                balance.get('nass_amt') or
+                0
+            )
+
+            total_asset = (
+                info.get('total_asset') or
+                info.get('prsm_dpst_aset_amt') or
+                info.get('tot_evlu_amt') or
+                0
+            )
+
+            logger.info(f"예수금: {int(available_cash):,}원")
+            logger.info(f"총자산: {int(total_asset):,}원")
             logger.info(f"보유종목: {len(holdings)}개")
+
+            # 현재 자본금 초기화
+            self.current_capital = int(total_asset) if total_asset else int(available_cash)
 
             # 기존 보유종목 포지션 복원
             for h in holdings:
@@ -336,35 +378,63 @@ class AutoTradingSystem:
                 logger.info(f"[{datetime.now():%H:%M:%S}] 계좌 조회")
                 logger.info("=" * 60)
 
-                # 잔고 조회
-                balance = await self.api_client.get_balance()
-                entr = int(balance.get('entr', '0'))  # 예수금
+                # 테스트 모드: 시뮬레이션 데이터 사용
+                if self.config['trading']['test_mode']:
+                    # 초기 자본금
+                    initial_capital = self.config['trading']['initial_capital']
 
-                logger.info(f"💰 예수금: {entr:,}원")
+                    # 시뮬레이션 포지션 기반 계산
+                    positions = self.strategy.get_all_positions()
 
-                # 계좌 정보 조회
-                info = await self.api_client.get_account_info()
-                prsm_dpst_aset_amt = int(info.get('prsm_dpst_aset_amt', '0'))  # 추정예탁자산
+                    total_investment = sum(p.get_total_investment() for p in positions)
+                    total_valuation = sum(p.entry_price * p.quantity for p in positions)  # 테스트 모드에서는 현재가 = 매수가
+                    entr = initial_capital - total_investment  # 남은 예수금
+                    prsm_dpst_aset_amt = entr + total_valuation  # 총자산
 
-                # 현재 총 자산 업데이트
-                self.current_capital = prsm_dpst_aset_amt
+                    self.current_capital = prsm_dpst_aset_amt
 
-                logger.info(f"📊 총자산: {prsm_dpst_aset_amt:,}원")
+                    logger.info(f"💰 예수금: {int(entr):,}원 (가상)")
+                    logger.info(f"📊 총자산: {int(prsm_dpst_aset_amt):,}원 (가상)")
 
-                # 보유 종목 조회 및 투자원금 계산
-                holdings = await self.api_client.get_holdings()
+                    holdings = positions  # 시뮬레이션 포지션 사용
+                else:
+                    # 실전 모드: 실제 API 호출
+                    balance = await self.api_client.get_balance()
+                    entr = int(balance.get('entr', '0'))  # 예수금
+
+                    logger.info(f"💰 예수금: {entr:,}원")
+
+                    # 계좌 정보 조회
+                    info = await self.api_client.get_account_info()
+                    prsm_dpst_aset_amt = int(info.get('prsm_dpst_aset_amt', '0'))  # 추정예탁자산
+
+                    # 현재 총 자산 업데이트
+                    self.current_capital = prsm_dpst_aset_amt
+
+                    logger.info(f"📊 총자산: {prsm_dpst_aset_amt:,}원")
+
+                    # 보유 종목 조회 및 투자원금 계산
+                    holdings = await self.api_client.get_holdings()
 
                 # 투자원금 = 보유종목의 매수금액 합계
                 total_investment = 0
                 total_valuation = 0
 
-                for h in holdings:
-                    qty = int(h.get('remn_qty', '0'))  # 잔고수량
-                    avg_price = float(h.get('avg_unpr', '0'))  # 평단가
-                    current_price = float(h.get('prsn_rate', avg_price))  # 현재가
+                # 테스트 모드와 실전 모드 처리 구분
+                if self.config['trading']['test_mode']:
+                    # 테스트 모드: Position 객체 사용
+                    for p in holdings:
+                        total_investment += p.get_total_investment()
+                        total_valuation += p.entry_price * p.quantity  # 테스트에서는 현재가 = 매수가
+                else:
+                    # 실전 모드: API 응답 데이터 사용
+                    for h in holdings:
+                        qty = int(h.get('remn_qty', '0'))  # 잔고수량
+                        avg_price = float(h.get('avg_unpr', '0'))  # 평단가
+                        current_price = float(h.get('prsn_rate', avg_price))  # 현재가
 
-                    total_investment += avg_price * qty  # 매수금액
-                    total_valuation += current_price * qty  # 평가금액
+                        total_investment += avg_price * qty  # 매수금액
+                        total_valuation += current_price * qty  # 평가금액
 
                 # 손익 계산
                 total_pnl = total_valuation - total_investment
@@ -391,19 +461,29 @@ class AutoTradingSystem:
                 if holdings:
                     logger.info("-" * 60)
                     for i, h in enumerate(holdings, 1):
-                        code = h.get('sht_cd', '')  # 단축코드
-                        name = h.get('pdno_hngl_nm', '')  # 상품명
-                        qty = int(h.get('remn_qty', '0'))  # 잔고수량
-                        avg_price = float(h.get('avg_unpr', '0'))  # 평단가
-                        current_price = float(h.get('prsn_rate', avg_price))  # 현재가
+                        if self.config['trading']['test_mode']:
+                            # 테스트 모드: Position 객체
+                            code = h.stock_code
+                            name = h.stock_name
+                            qty = h.quantity
+                            avg_price = h.entry_price
+                            current_price = h.entry_price  # 테스트에서는 현재가 = 매수가
+                        else:
+                            # 실전 모드: API 응답 데이터
+                            code = h.get('sht_cd', '')  # 단축코드
+                            name = h.get('pdno_hngl_nm', '')  # 상품명
+                            qty = int(h.get('remn_qty', '0'))  # 잔고수량
+                            avg_price = float(h.get('avg_unpr', '0'))  # 평단가
+                            current_price = float(h.get('prsn_rate', avg_price))  # 현재가
 
                         investment = avg_price * qty  # 매수금액
                         valuation = current_price * qty  # 평가금액
                         pnl = valuation - investment  # 손익
                         pnl_pct = (pnl / investment * 100) if investment > 0 else 0
 
+                        mode_tag = "[테스트] " if self.config['trading']['test_mode'] else ""
                         logger.info(
-                            f"{i}. {name}({code}) "
+                            f"{mode_tag}{i}. {name}({code}) "
                             f"{qty}주 @{int(avg_price):,}원 → {int(current_price):,}원 | "
                             f"투자: {int(investment):,}원 → 평가: {int(valuation):,}원 "
                             f"({int(pnl):+,}원, {pnl_pct:+.2f}%)"

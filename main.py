@@ -51,9 +51,13 @@ class AutoTradingSystem:
                 self.scanner = StockScanner(api_client)
                 self.portfolio = PortfolioManager(self.strategy)
 
-                # WebSocket 초기화
-                self.ws_client = KiwoomWebSocketClient(api_client.access_token)
-                await self._setup_websocket_handlers()
+                # WebSocket 초기화 (테스트 모드에서는 스킵 가능)
+                if not self.config['trading']['test_mode']:
+                    self.ws_client = KiwoomWebSocketClient(api_client.access_token)
+                    await self._setup_websocket_handlers()
+                else:
+                    logger.info("🧪 테스트 모드: WebSocket 초기화 스킵")
+                    self.ws_client = None
 
                 # 계좌 확인
                 await self._check_account()
@@ -62,13 +66,17 @@ class AutoTradingSystem:
                 self.is_running = True
 
                 # 병렬 실행: 메인 루프 + WebSocket + 포지션 모니터링 + 계좌 모니터링
-                await asyncio.gather(
+                tasks = [
                     self._main_loop(),
-                    self.ws_client.start(),
                     self._monitor_positions(),
                     self._monitor_account(),
-                    return_exceptions=True
-                )
+                ]
+
+                # WebSocket은 테스트 모드가 아닐 때만 시작
+                if self.ws_client is not None:
+                    tasks.append(self.ws_client.start())
+
+                await asyncio.gather(*tasks, return_exceptions=True)
 
         except KeyboardInterrupt:
             logger.info("사용자 중단")

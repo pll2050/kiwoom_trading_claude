@@ -35,7 +35,19 @@ class KiwoomRestClient:
 
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
-        await self.get_access_token()
+
+        # 테스트 모드 확인
+        from src.utils.config_loader import load_config
+        config = load_config("config")
+        test_mode = config.get('trading', {}).get('test_mode', False)
+
+        if test_mode:
+            logger.info("🧪 테스트 모드: API 토큰 발급 스킵")
+            self.access_token = "TEST_TOKEN"
+            self.token_expires_at = datetime.now() + timedelta(days=1)
+        else:
+            await self.get_access_token()
+
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

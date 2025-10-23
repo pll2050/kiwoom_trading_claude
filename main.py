@@ -214,8 +214,14 @@ class AutoTradingSystem:
                         f"    - 이유: {ai.get('reason')}"
                     )
 
-                if not self.config['trading']['test_mode'] and buy_recs:
-                    await self._execute_trades(buy_recs[:5])
+                if buy_recs:
+                    if self.config['trading']['test_mode']:
+                        logger.info("")
+                        logger.info("⚠️  테스트 모드: 실제 주문은 실행되지 않습니다")
+                        logger.info("   config.yaml에서 test_mode: false로 변경하면 실제 매매 시작")
+                        logger.info("")
+                    else:
+                        await self._execute_trades(buy_recs[:5])
 
             except Exception as e:
                 logger.error(f"AI Scan 오류: {e}", exc_info=True)
@@ -224,6 +230,14 @@ class AutoTradingSystem:
     async def _execute_trades(self, stocks: List):
         """매수 실행 (동적 리스크 관리 적용)"""
         try:
+            # 매수 시도/성공 카운터
+            attempt_count = len(stocks)
+            success_count = 0
+
+            logger.info("=" * 60)
+            logger.info(f"📋 매수 시도: {attempt_count}개 종목")
+            logger.info("=" * 60)
+
             # 현재 포지션 수
             num_positions = len(self.strategy.positions)
 
@@ -272,7 +286,7 @@ class AutoTradingSystem:
                     position_pct = (investment_amount / self.current_capital * 100) if self.current_capital > 0 else 0
 
                     logger.info(
-                        f"[{risk_decision['mode']}] 매수 주문: {name} {qty}주 @{price:,}원 "
+                        f"✅ [{risk_decision['mode']}] 매수 주문 성공: {name} {qty}주 @{price:,}원 "
                         f"(투자: {investment_amount:,}원, {position_pct:.1f}%)"
                     )
 
@@ -284,9 +298,17 @@ class AutoTradingSystem:
 
                     # 포지션 수 증가
                     num_positions += 1
+                    success_count += 1
 
                 except Exception as e:
-                    logger.error(f"매수 실패 ({s.get('name')}): {e}", exc_info=True)
+                    logger.error(f"❌ 매수 실패 ({s.get('name')}): {e}", exc_info=True)
+
+            # 매수 결과 요약
+            logger.info("=" * 60)
+            logger.info(f"✅ 매수 완료: {success_count}/{attempt_count}개 성공")
+            if success_count < attempt_count:
+                logger.warning(f"⚠️  매수 실패: {attempt_count - success_count}개")
+            logger.info("=" * 60)
 
         except Exception as e:
             logger.error(f"매수 실행 오류: {e}", exc_info=True)
@@ -393,6 +415,14 @@ class AutoTradingSystem:
                 # 포지션 손익 체크
                 sell_signals = self.portfolio.check_all_positions(self.current_prices)
 
+                if sell_signals:
+                    logger.info("=" * 60)
+                    logger.info(f"📋 매도 신호: {len(sell_signals)}개 종목")
+                    logger.info("=" * 60)
+
+                sell_success_count = 0
+                sell_attempt_count = len(sell_signals)
+
                 for signal in sell_signals:
                     position = signal['position']
                     decision = signal['decision']
@@ -404,8 +434,25 @@ class AutoTradingSystem:
                     )
 
                     # 매도 실행
-                    if not self.config['trading']['test_mode']:
-                        await self._execute_sell(position, decision['price'])
+                    if self.config['trading']['test_mode']:
+                        logger.info("   [테스트 모드] 실제 매도는 실행되지 않습니다")
+                    else:
+                        success = await self._execute_sell(position, decision['price'])
+                        if success:
+                            sell_success_count += 1
+
+                # 매도 결과 요약
+                if sell_signals:
+                    if self.config['trading']['test_mode']:
+                        logger.info("=" * 60)
+                        logger.info("⚠️  테스트 모드: 실제 매도는 실행되지 않습니다")
+                        logger.info("=" * 60)
+                    else:
+                        logger.info("=" * 60)
+                        logger.info(f"✅ 매도 완료: {sell_success_count}/{sell_attempt_count}개 성공")
+                        if sell_success_count < sell_attempt_count:
+                            logger.warning(f"⚠️  매도 실패: {sell_attempt_count - sell_success_count}개")
+                        logger.info("=" * 60)
 
                 # 포트폴리오 요약 출력 (5분마다)
                 if datetime.now().minute % 5 == 0:
@@ -417,7 +464,7 @@ class AutoTradingSystem:
                 logger.error(f"포지션 모니터링 오류: {e}", exc_info=True)
                 await asyncio.sleep(10)
 
-    async def _execute_sell(self, position: Any, price: float):
+    async def _execute_sell(self, position: Any, price: float) -> bool:
         """매도 실행"""
         try:
             result = await self.api_client.order_sell(
@@ -427,7 +474,7 @@ class AutoTradingSystem:
             )
 
             logger.info(
-                f"매도 주문: {position.stock_name} "
+                f"✅ 매도 주문 성공: {position.stock_name} "
                 f"{position.quantity}주 @{price:,}원"
             )
 
@@ -440,8 +487,11 @@ class AutoTradingSystem:
                 position.stock_code
             )
 
+            return True
+
         except Exception as e:
-            logger.error(f"매도 실패 ({position.stock_name}): {e}", exc_info=True)
+            logger.error(f"❌ 매도 실패 ({position.stock_name}): {e}", exc_info=True)
+            return False
 
     async def _log_portfolio_summary(self):
         """포트폴리오 요약 로그"""

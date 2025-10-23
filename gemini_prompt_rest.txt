@@ -1,0 +1,20 @@
+다음 요구사항에 맞춰 src/kiwoom/rest_client.py 파일을 생성해주세요.
+
+참고 문서:
+- docs/KIWOOM_API_REFERENCE.md
+- PROJECT_REQUIREMENTS.md
+- config/config.yaml
+
+요구사항:
+1. KiwoomRestClient 클래스 구현
+2. OAuth 인증 (au10001, au10002)
+3. 계좌 조회 API (kt00001, kt00003, kt00010, kt00018, ka10085)
+4. 주문 실행 API (kt10000, kt10001, kt10002, kt10003)
+5. 시세 조회 API (ka10004, ka10005)
+6. 스캐닝용 API (ka10023, ka10030, ka10032, ka10027)
+7. aiohttp 사용한 비동기 처리
+8. 에러 핸들링 및 재시도 로직
+9. 토큰 자동 갱신
+10. 한글 주석, 타입 힌트, Docstring 포함
+
+파일을 생성해주세요.

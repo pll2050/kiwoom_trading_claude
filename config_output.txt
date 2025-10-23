@@ -1,0 +1,255 @@
+[DEBUG] CLI: Delegating hierarchical memory load to server for CWD: d:\Projects\python\kiwoom_trading_claude (memoryImportFormat: tree)
+[DEBUG] [MemoryDiscovery] Loading server hierarchical memory for CWD: d:\Projects\python\kiwoom_trading_claude (importFormat: tree)
+[DEBUG] [MemoryDiscovery] Found readable global GEMINI.md: C:\Users\2AP2025-006\.gemini\GEMINI.md
+[DEBUG] [MemoryDiscovery] Searching for GEMINI.md starting from CWD: d:\Projects\python\kiwoom_trading_claude
+[DEBUG] [MemoryDiscovery] Determined project root: None
+[DEBUG] [BfsFileSearch] Scanning [1/200]: batch of 1
+[DEBUG] [BfsFileSearch] Scanning [6/200]: batch of 5
+[DEBUG] [BfsFileSearch] Scanning [12/200]: batch of 6
+[DEBUG] [MemoryDiscovery] Final ordered GEMINI.md paths to read: ["C:\\Users\\2AP2025-006\\.gemini\\GEMINI.md"]
+[DEBUG] [MemoryDiscovery] Successfully read and processed imports: C:\Users\2AP2025-006\.gemini\GEMINI.md (Length: 223)
+[DEBUG] [MemoryDiscovery] Combined instructions length: 351
+[DEBUG] [MemoryDiscovery] Combined instructions (snippet): --- Context from: C:\Users\2AP2025-006\.gemini\GEMINI.md ---
+## Gemini Added Memories
+- The user prefers responses in Korean.
+- The user prefers responses in Korean.
+- 사용자는 GEMINI.md 파일을 프로젝트의 지침과 맥락을 파악하는 용도로 사용하기를 원합니다.
+- 사용자는 GEMINI.md (대문자) 파일을 프로젝트의 지침과 맥락을 파악하는 용도로 사용하기를 원합니다.
+--- End of Context from: C:\Users\2AP2025-006\.gemini\GEMINI.md ---...
+Loaded cached credentials.
+Flushing log events to Clearcut.
+[AgentRegistry] Initialized with 1 agents.
+File C:\Users\2AP2025-006\.cache/vscode-ripgrep/ripgrep-v13.0.0-10-x86_64-pc-windows-msvc.zip has been cached
+ClearcutLogger: Flush already in progress, marking pending flush.
+Flushing log events to Clearcut.
+Flushing log events to Clearcut.
+Session ID: 2abfdc57-4343-4f3a-858e-b868cf9b0cb5
+알겠습니다. 프로젝트 설정 파일 3개를 생성하겠습니다.
+
+먼저 `docs/STOCK_SCANNING_STRATEGY.md` 파일을 읽어 `scanning_rules.yaml` 파일 내용을 구성하겠습니다.네, `docs/STOCK_SCANNING_STRATEGY.md` 파일의 내용을 확인했습니다. 이 내용을 바탕으로 요청하신 3개의 YAML 설정 파일을 생성하겠습니다.Error executing tool write_file: Tool "write_file" not found in registry. Tools must use the exact names that are registered. Did you mean one of: "read_file", "web_fetch", "glob"?
+Error executing tool write_file: Tool "write_file" not found in registry. Tools must use the exact names that are registered. Did you mean one of: "read_file", "web_fetch", "glob"?
+Error executing tool write_file: Tool "write_file" not found in registry. Tools must use the exact names that are registered. Did you mean one of: "read_file", "web_fetch", "glob"?
+요청하신 설정 파일들을 생성하려고 했으나, 파일을 생성할 수 있는 `write_file` 도구가 현재 제 환경에서 사용할 수 없는 것으로 보입니다.
+
+대신, 각 파일의 전체 내용을 아래에 제공해 드리니, `config` 디렉토리를 생성하신 후 직접 파일을 만들어 내용을 붙여넣어 주시겠어요?
+
+---
+
+### 1. `config/config.yaml`
+
+```yaml
+# ==============================================================================
+# 키움증권 API 설정 (Kiwoom API Settings)
+# ==============================================================================
+kiwoom:
+  app_key: "YOUR_KIWOOM_APP_KEY"      # 키움증권 API 앱 키
+  app_secret: "YOUR_KIWOOM_APP_SECRET" # 키움증권 API 앱 시크릿
+  account_number: "YOUR_ACCOUNT_NUMBER" # 실제 투자에 사용할 계좌번호 (모의투자 계좌번호도 가능)
+  base_url: "https://openapi.kiwoom.com:9443" # 키움증권 REST API 기본 URL
+  websocket_url: "wss://openapi.kiwoom.com:21000" # 실시간 데이터 수신을 위한 웹소켓 URL
+
+# ==============================================================================
+# Gemini API 설정 (Gemini API Settings)
+# ==============================================================================
+gemini:
+  api_key: "YOUR_GEMINI_API_KEY" # Google Gemini API 키
+  model: "gemini-1.5-pro-latest"   # 사용할 Gemini 모델 (예: gemini-pro, gemini-1.5-flash-latest)
+
+# ==============================================================================
+# 거래 설정 (Trading Settings)
+# ==============================================================================
+trading:
+  # 종목당 최대 투자 금액 (원)
+  # 예: 1,000,000원 -> 한 종목에 최대 100만원까지 투자
+  max_investment_per_stock: 1000000
+
+  # 일일 최대 손실 한도 (원)
+  # 이 금액 이상 손실이 발생하면 당일 모든 거래를 중단
+  daily_max_loss: 500000
+
+  # 테스트 모드 (True: 모의 투자, False: 실전 투자)
+  # True로 설정하면 실제 주문이 나가지 않고 로그만 기록
+  test_mode: True
+```
+
+---
+
+### 2. `config/trading_rules.yaml`
+
+```yaml
+# ==============================================================================
+# 손절 / 익절 기준 (Stop-Loss / Take-Profit Rules)
+# ==============================================================================
+profit_loss:
+  # 기본 손절매 비율 (%)
+  # 매수 가격 대비 이 비율만큼 하락하면 자동으로 손절
+  stop_loss_percentage: -3.0
+
+  # 기본 익절 비율 (%)
+  # 매수 가격 대비 이 비율만큼 상승하면 자동으로 익절
+  take_profit_percentage: 5.0
+
+  # 트레일링 스탑 (Trailing Stop) 설정
+  # 고점 대비 일정 비율 하락 시 익절하는 기능
+  trailing_stop:
+    enabled: True
+    # 고점 대비 하락률 (%)
+    # 예: 2.0 -> 주가가 최고점을 찍고 2% 하락하면 매도
+    drawdown_percentage: 2.0
+
+# ==============================================================================
+# 포지션 크기 설정 (Position Sizing)
+# ==============================================================================
+position_sizing:
+  # 계좌 총 자산 대비 최대 비중 (%)
+  # 한 종목에 투자할 금액이 계좌 총 자산의 이 비율을 넘지 않도록 제한
+  # 예: 20.0 -> 총 자산이 1000만원이면 한 종목에 최대 200만원 투자
+  max_portion_per_stock: 20.0
+
+  # 위험 기반 포지션 크기 조절 (켈리 공식 등)
+  # True로 설정하면 종목의 변동성, 승률 등을 고려하여 투자 금액을 동적으로 조절
+  risk_based_sizing:
+    enabled: False
+    # 사용할 전략 (예: kelly_criterion)
+    strategy: "fixed_fractional" # 우선 고정 비율 사용
+    # 고정 비율 값 (계좌 자산의 %)
+    fraction: 10.0
+
+# ==============================================================================
+# 거래 시간 설정 (Trading Hours)
+# ==============================================================================
+trading_hours:
+  # 거래 시작 시간 (HH:MM:SS)
+  # 이 시간 이후부터 매수 주문 가능
+  market_open: "09:00:00"
+
+  # 신규 매수 마감 시간 (HH:MM:SS)
+  # 이 시간 이후에는 새로운 종목을 매수하지 않음 (오버나잇 리스크 관리)
+  new_buy_close: "15:00:00"
+
+  # 당일 청산 시간 (HH:MM:SS)
+  # 이 시간이 되면 보유 중인 모든 종목을 시장가로 매도 (데이트레이딩 전략 시)
+  day_trading_close: "15:20:00"
+
+  # 당일 청산 기능 활성화 여부
+  # True로 설정하면 day_trading_close 시간에 모든 포지션 정리
+  enable_day_trading_close: False
+```
+
+---
+
+### 3. `config/scanning_rules.yaml`
+
+```yaml
+# ==============================================================================
+# 종목 스캐닝 규칙 (Stock Scanning Rules)
+# docs/STOCK_SCANNING_STRATEGY.md 문서를 기반으로 작성됨
+# ==============================================================================
+scanning:
+  # ----------------------------------------------------------------------------
+  # 스캔 주기 설정 (Scan Intervals)
+  # ----------------------------------------------------------------------------
+  intervals:
+    # 빠른 스캔: 거래량/가격 등 기본적인 항목을 빠르게 확인 (단위: 초)
+    fast_scan: 10
+    # 정밀 스캔: 빠른 스캔에서 필터링된 종목을 대상으로 심층 분석 (단위: 초)
+    deep_scan: 60
+    # AI 분석: 정밀 스캔에서 높은 점수를 받은 종목을 Gemini AI로 분석 (단위: 초)
+    ai_analysis: 300
+
+  # ----------------------------------------------------------------------------
+  # 기본 필터링 조건 (Basic Filtering Conditions)
+  # ----------------------------------------------------------------------------
+  filters:
+    # 최소 거래대금 (원)
+    # 이 금액 미만의 종목은 초기 스크리닝 단계에서 제외
+    min_trading_value: 1000000000 # 10억
+
+    # 스캐닝 대상에서 제외할 종목 조건
+    # (예: 관리종목, 거래정지, 투자주의/경고, 상한가/하한가 등)
+    exclude_conditions:
+      - "관리종목"
+      - "거래정지"
+      - "투자주의"
+      - "투자경고"
+      - "투자위험"
+      - "상한가"
+      - "하한가"
+
+  # ----------------------------------------------------------------------------
+  # 점수 계산을 위한 가중치 (Scoring Weights)
+  # 각 항목의 중요도에 따라 가중치를 부여 (1.0이 기준)
+  # ----------------------------------------------------------------------------
+  weights:
+    volume: 1.0         # 거래량
+    price: 1.0          # 가격 변동
+    foreign_institute: 1.2 # 외국인/기관 수급 (중요)
+    bid_ask_ratio: 0.8  # 매수/매도 호가 비율
+    trade_strength: 1.0 # 체결 강도
+    broker: 0.9         # 거래원 분석
+    program_trade: 0.7  # 프로그램 매매
+    technical: 1.1      # 기술적 지표 (중요)
+    theme_news: 0.6     # 테마 및 뉴스
+    vi_status: 0.5      # 변동성 완화 장치
+
+  # ----------------------------------------------------------------------------
+  # 스캐닝 항목별 상세 조건 및 점수 (Detailed Criteria & Scores)
+  # ----------------------------------------------------------------------------
+  criteria:
+    # 1. 거래량 급증 (Volume Surge)
+    volume:
+      - { threshold: 1000, score: 60 } # 전일 대비 1000% 이상
+      - { threshold: 500, score: 40 }  # 500% 이상
+      - { threshold: 300, score: 20 }  # 300% 이상
+
+    # 2. 가격 급등 (Price Spike)
+    price:
+      - { threshold: 7, score: 35 } # 등락률 7% 이상
+      - { threshold: 5, score: 25 } # 5% 이상
+      - { threshold: 3, score: 15 } # 3% 이상
+    price_proximity_to_high: # 고가 근접
+      - { threshold: -1.0, score: 10 } # 고가 대비 -1% 이내
+
+    # 3. 외국인/기관 매수 (Foreign/Institute Buy)
+    foreign:
+      - { consecutive_days: 3, score: 30 } # 3일 연속 순매수
+      - { consecutive_days: 2, score: 20 } # 2일 연속 순매수
+      - { consecutive_days: 1, score: 10 } # 당일 순매수
+    institute:
+      - { amount_billion: 50, score: 40 } # 50억 이상 순매수
+      - { amount_billion: 10, score: 20 } # 10억 이상 순매수
+
+    # 4. 호가 강도 (Bid/Ask Ratio)
+    bid_ask_ratio:
+      - { threshold: 3.0, score: 35 } # 매수잔량/매도잔량 300% 이상
+      - { threshold: 2.0, score: 25 } # 200% 이상
+      - { threshold: 1.5, score: 15 } # 150% 이상
+
+    # 5. 체결 강도 (Trade Strength)
+    trade_strength:
+      - { threshold: 200, score: 40 } # 체결강도 200% 이상
+      - { threshold: 150, score: 25 } # 150% 이상
+      - { threshold: 120, score: 15 } # 120% 이상
+
+  # ----------------------------------------------------------------------------
+  # 종합 점수 및 등급 기준 (Total Score & Grade Thresholds)
+  # ----------------------------------------------------------------------------
+  grading:
+    # AI 분석을 시작하기 위한 최소 종합 점수
+    ai_analysis_min_score: 200
+
+    # 등급 분류 기준
+    s_grade: 350 # S등급 (매우 강력 매수)
+    a_grade: 280 # A등급 (강력 매수)
+    b_grade: 200 # B등급 (매수 고려)
+    c_grade: 150 # C등급 (관망)
+
+  # ----------------------------------------------------------------------------
+  # AI 분석 관련 설정 (AI Analysis Settings)
+  # ----------------------------------------------------------------------------
+  ai_analysis:
+    # AI의 분석 결과를 신뢰하기 위한 최소 신뢰도(confidence) 점수
+    # Gemini가 반환한 결과의 confidence 값이 이 값 이상일 때만 유효한 것으로 판단
+    min_confidence_score: 0.75 # 75%
+```Flushing log events to Clearcut.
+

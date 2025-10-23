@@ -1,0 +1,99 @@
+# ==============================================================================
+# 종목 스캐닝 규칙 (Stock Scanning Rules)
+# docs/STOCK_SCANNING_STRATEGY.md 문서를 기반으로 작성됨
+# ==============================================================================
+scanning:
+  # ----------------------------------------------------------------------------
+  # 스캔 주기 설정 (Scan Intervals)
+  # ----------------------------------------------------------------------------
+  intervals:
+    fast_scan: 10      # 빠른 스캔 (초)
+    deep_scan: 60      # 정밀 스캔 (초)
+    ai_analysis: 300   # AI 분석 (초)
+
+  # ----------------------------------------------------------------------------
+  # 기본 필터링 조건 (Basic Filtering Conditions)
+  # ----------------------------------------------------------------------------
+  filters:
+    min_trading_value: 1000000000  # 최소 거래대금 10억
+
+    exclude_conditions:
+      - "관리종목"
+      - "거래정지"
+      - "투자주의"
+      - "투자경고"
+      - "투자위험"
+      - "상한가"
+      - "하한가"
+
+  # ----------------------------------------------------------------------------
+  # 점수 계산을 위한 가중치 (Scoring Weights)
+  # ----------------------------------------------------------------------------
+  weights:
+    volume: 1.0
+    price: 1.0
+    foreign_institute: 1.2
+    bid_ask_ratio: 0.8
+    trade_strength: 1.0
+    broker: 0.9
+    program_trade: 0.7
+    technical: 1.1
+    theme_news: 0.6
+    vi_status: 0.5
+
+  # ----------------------------------------------------------------------------
+  # 스캐닝 항목별 상세 조건 및 점수 (Detailed Criteria & Scores)
+  # ----------------------------------------------------------------------------
+  criteria:
+    # 1. 거래량 급증
+    volume:
+      - { threshold: 1000, score: 60 }
+      - { threshold: 500, score: 40 }
+      - { threshold: 300, score: 20 }
+
+    # 2. 가격 급등
+    price:
+      - { threshold: 7, score: 35 }
+      - { threshold: 5, score: 25 }
+      - { threshold: 3, score: 15 }
+
+    price_proximity_to_high:
+      - { threshold: -1.0, score: 10 }
+
+    # 3. 외국인/기관 매수
+    foreign:
+      - { consecutive_days: 3, score: 30 }
+      - { consecutive_days: 2, score: 20 }
+      - { consecutive_days: 1, score: 10 }
+
+    institute:
+      - { amount_billion: 50, score: 40 }
+      - { amount_billion: 10, score: 20 }
+
+    # 4. 호가 강도
+    bid_ask_ratio:
+      - { threshold: 3.0, score: 35 }
+      - { threshold: 2.0, score: 25 }
+      - { threshold: 1.5, score: 15 }
+
+    # 5. 체결 강도
+    trade_strength:
+      - { threshold: 200, score: 40 }
+      - { threshold: 150, score: 25 }
+      - { threshold: 120, score: 15 }
+
+  # ----------------------------------------------------------------------------
+  # 종합 점수 및 등급 기준 (Total Score & Grade Thresholds)
+  # ----------------------------------------------------------------------------
+  grading:
+    ai_analysis_min_score: 200
+    s_grade: 350
+    a_grade: 280
+    b_grade: 200
+    c_grade: 150
+
+  # ----------------------------------------------------------------------------
+  # AI 분석 관련 설정 (AI Analysis Settings)
+  # ----------------------------------------------------------------------------
+  ai_analysis:
+    min_confidence_score: 0.75

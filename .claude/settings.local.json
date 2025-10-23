@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(findstr /C:\"총\" /C:\"통과\" /C:\"실패\")",
+      "Bash(python test_system.py)",
+      "Bash(Select-String -Pattern \"통과|실패|총\")",
+      "Bash(timeout 15 python main.py)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

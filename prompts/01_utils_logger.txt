@@ -1,0 +1,13 @@
+파일 경로: src/utils/logger.py
+
+요구사항:
+1. loguru를 사용한 로깅 시스템 구현
+2. 파일 로그와 콘솔 로그 동시 지원
+3. 로그 레벨: DEBUG, INFO, WARNING, ERROR, CRITICAL
+4. 로그 파일은 logs/ 디렉토리에 날짜별로 저장
+5. 로그 포맷: 시간, 레벨, 모듈명, 메시지 포함
+6. 로그 파일 로테이션: 10MB마다, 최대 30개 파일 유지
+
+참고 문서: PROJECT_REQUIREMENTS.md
+
+위 요구사항에 맞춰 src/utils/logger.py 파일을 작성해주세요.

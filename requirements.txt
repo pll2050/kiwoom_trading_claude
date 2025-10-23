@@ -1,0 +1,31 @@
+# PDF 처리
+PyPDF2>=3.0.0
+
+# HTTP 클라이언트
+requests>=2.31.0
+aiohttp>=3.9.0
+
+# WebSocket
+websockets>=12.0
+
+# 설정 파일 파싱
+PyYAML>=6.0
+
+# Google Gemini API
+google-generativeai>=0.3.0
+
+# 데이터 처리 (버전 제한 완화)
+pandas>=2.0.0
+numpy>=1.24.0
+
+# 기술적 지표 계산
+ta>=0.10.0
+
+# 로깅
+loguru>=0.7.0
+
+# 날짜/시간 처리
+python-dateutil>=2.8.0
+
+# 환경변수 관리
+python-dotenv>=1.0.0

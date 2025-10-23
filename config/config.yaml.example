@@ -7,12 +7,16 @@ kiwoom:
   account_number: "YOUR_ACCOUNT_NUMBER" # 계좌번호
 
   # 키움증권 REST API 주소
-  base_url: "https://mockapi.kiwoom.com"          # 키움증권 REST API 기본 URL
-  websocket_url: "wss://mockapi.kiwoom.com:10000/api/dostk/websocket" # 실시간 데이터 수신을 위한 웹소켓 URL
+  # ⚠️ Mock API 서버가 다운된 경우 실제 운영 API로 변경하세요
+  base_url: "https://mockapi.kiwoom.com"          # Mock API (테스트용)
+  websocket_url: "wss://mockapi.kiwoom.com:10000/api/dostk/websocket"
 
-  # 운영 도메인으로 변경 시:
+  # 🔴 Mock API 서버 오류 시 아래 운영 도메인 사용:
   # base_url: "https://api.kiwoom.com"
   # websocket_url: "wss://api.kiwoom.com:10000/api/dostk/websocket"
+
+  # 📌 주의: 운영 API는 실제 거래가 실행됩니다!
+  # test_mode: true 설정을 확인하세요
 
 # ==============================================================================
 # Gemini API 설정 (Gemini API Settings)

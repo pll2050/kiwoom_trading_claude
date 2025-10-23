@@ -152,6 +152,45 @@ class KiwoomRestClient:
                 json=data,
                 headers=headers
             ) as response:
+                # 응답 상태 코드 확인
+                if response.status != 200:
+                    response_text = await response.text()
+                    logger.error(
+                        f"토큰 발급 실패 - HTTP {response.status}\n"
+                        f"URL: {self.base_url}{endpoint}\n"
+                        f"응답: {response_text[:500]}"
+                    )
+                    raise Exception(f"HTTP {response.status}: 토큰 발급 실패")
+
+                # Content-Type 확인
+                content_type = response.headers.get('Content-Type', '')
+                if 'application/json' not in content_type:
+                    response_text = await response.text()
+                    logger.error(
+                        f"JSON이 아닌 응답 수신 - Content-Type: {content_type}\n"
+                        f"URL: {self.base_url}{endpoint}\n"
+                        f"응답 내용:\n{response_text[:1000]}"
+                    )
+
+                    # Mock API 서버 문제인 경우 안내
+                    if 'text/html' in content_type:
+                        logger.error(
+                            "\n" + "="*60 + "\n"
+                            "🚨 Mock API 서버 오류\n"
+                            "="*60 + "\n"
+                            "Mock API 서버가 HTML을 반환했습니다.\n"
+                            "가능한 원인:\n"
+                            "1. Mock API 서버가 다운되었거나 점검 중\n"
+                            "2. API 엔드포인트가 변경됨\n"
+                            "3. config.yaml에서 실제 운영 API URL 사용 필요\n\n"
+                            "해결 방법:\n"
+                            "- 키움증권 OpenAPI 문서 확인\n"
+                            "- config.yaml의 base_url을 실제 운영 URL로 변경\n"
+                            "- 키움증권 고객센터에 문의\n"
+                            + "="*60
+                        )
+                    raise Exception(f"서버가 JSON 대신 {content_type} 응답")
+
                 result = await response.json()
 
                 # 키움증권 응답: token, token_type, expires_dt

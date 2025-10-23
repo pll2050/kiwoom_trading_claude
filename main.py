@@ -217,11 +217,10 @@ class AutoTradingSystem:
                 if buy_recs:
                     if self.config['trading']['test_mode']:
                         logger.info("")
-                        logger.info("⚠️  테스트 모드: 실제 주문은 실행되지 않습니다")
-                        logger.info("   config.yaml에서 test_mode: false로 변경하면 실제 매매 시작")
+                        logger.info("🧪 테스트 모드: 시뮬레이션 매수 실행")
+                        logger.info("   (실제 API 호출 없이 로그만 출력)")
                         logger.info("")
-                    else:
-                        await self._execute_trades(buy_recs[:5])
+                    await self._execute_trades(buy_recs[:5])
 
             except Exception as e:
                 logger.error(f"AI Scan 오류: {e}", exc_info=True)
@@ -266,12 +265,18 @@ class AutoTradingSystem:
                         logger.warning(f"매수 불가 ({name}): {decision['reason']}")
                         continue
 
-                    # 현재가 조회
-                    quote = await self.api_client.get_quote(code)
-                    price = quote.get('price', 0)
-                    if price == 0:
-                        logger.warning(f"가격 정보 없음: {name}")
-                        continue
+                    # 현재가 조회 (테스트 모드에서는 시뮬레이션)
+                    if self.config['trading']['test_mode']:
+                        # 시뮬레이션: AI 분석의 현재가 사용
+                        price = s.get('price', 50000)  # 기본값 50,000원
+                        if price == 0:
+                            price = 50000
+                    else:
+                        quote = await self.api_client.get_quote(code)
+                        price = quote.get('price', 0)
+                        if price == 0:
+                            logger.warning(f"가격 정보 없음: {name}")
+                            continue
 
                     # 동적 리스크 관리: 포지션 크기 계산
                     qty = self.risk_manager.calculate_position_size(self.current_capital, price)
@@ -280,21 +285,27 @@ class AutoTradingSystem:
                         continue
 
                     # 주문 실행
-                    result = await self.api_client.order_buy(code, qty, price)
+                    if self.config['trading']['test_mode']:
+                        # 시뮬레이션: 주문 성공으로 가정 (API 호출 없음)
+                        pass
+                    else:
+                        await self.api_client.order_buy(code, qty, price)
 
                     investment_amount = price * qty
                     position_pct = (investment_amount / self.current_capital * 100) if self.current_capital > 0 else 0
 
+                    mode_prefix = "[테스트] " if self.config['trading']['test_mode'] else ""
                     logger.info(
-                        f"✅ [{risk_decision['mode']}] 매수 주문 성공: {name} {qty}주 @{price:,}원 "
+                        f"✅ {mode_prefix}[{risk_decision['mode']}] 매수 주문 성공: {name} {qty}주 @{price:,}원 "
                         f"(투자: {investment_amount:,}원, {position_pct:.1f}%)"
                     )
 
                     # 포지션 추가
                     self.strategy.add_position(code, name, qty, price)
 
-                    # 실시간 현재가 구독
-                    await self.ws_client.subscribe_current_price(code)
+                    # 실시간 현재가 구독 (테스트 모드에서는 스킵)
+                    if not self.config['trading']['test_mode']:
+                        await self.ws_client.subscribe_current_price(code)
 
                     # 포지션 수 증가
                     num_positions += 1
@@ -434,25 +445,20 @@ class AutoTradingSystem:
                     )
 
                     # 매도 실행
-                    if self.config['trading']['test_mode']:
-                        logger.info("   [테스트 모드] 실제 매도는 실행되지 않습니다")
-                    else:
-                        success = await self._execute_sell(position, decision['price'])
-                        if success:
-                            sell_success_count += 1
+                    success = await self._execute_sell(position, decision['price'])
+                    if success:
+                        sell_success_count += 1
 
                 # 매도 결과 요약
                 if sell_signals:
+                    logger.info("=" * 60)
                     if self.config['trading']['test_mode']:
-                        logger.info("=" * 60)
-                        logger.info("⚠️  테스트 모드: 실제 매도는 실행되지 않습니다")
-                        logger.info("=" * 60)
+                        logger.info(f"🧪 [테스트 모드] 매도 시뮬레이션: {sell_success_count}/{sell_attempt_count}개 성공")
                     else:
-                        logger.info("=" * 60)
                         logger.info(f"✅ 매도 완료: {sell_success_count}/{sell_attempt_count}개 성공")
-                        if sell_success_count < sell_attempt_count:
-                            logger.warning(f"⚠️  매도 실패: {sell_attempt_count - sell_success_count}개")
-                        logger.info("=" * 60)
+                    if sell_success_count < sell_attempt_count:
+                        logger.warning(f"⚠️  매도 실패: {sell_attempt_count - sell_success_count}개")
+                    logger.info("=" * 60)
 
                 # 포트폴리오 요약 출력 (5분마다)
                 if datetime.now().minute % 5 == 0:
@@ -467,25 +473,32 @@ class AutoTradingSystem:
     async def _execute_sell(self, position: Any, price: float) -> bool:
         """매도 실행"""
         try:
-            result = await self.api_client.order_sell(
-                position.stock_code,
-                position.quantity,
-                int(price)
-            )
+            # 주문 실행 (테스트 모드에서는 API 호출 없음)
+            if self.config['trading']['test_mode']:
+                # 시뮬레이션: 주문 성공으로 가정
+                pass
+            else:
+                await self.api_client.order_sell(
+                    position.stock_code,
+                    position.quantity,
+                    int(price)
+                )
 
+            mode_prefix = "[테스트] " if self.config['trading']['test_mode'] else ""
             logger.info(
-                f"✅ 매도 주문 성공: {position.stock_name} "
+                f"✅ {mode_prefix}매도 주문 성공: {position.stock_name} "
                 f"{position.quantity}주 @{price:,}원"
             )
 
             # 포지션 제거
             realized_pnl = self.strategy.remove_position(position.stock_code, price)
 
-            # 실시간 구독 해제
-            await self.ws_client.unsubscribe(
-                KiwoomWebSocketClient.RT_CURRENT_PRICE,
-                position.stock_code
-            )
+            # 실시간 구독 해제 (테스트 모드에서는 스킵)
+            if not self.config['trading']['test_mode']:
+                await self.ws_client.unsubscribe(
+                    KiwoomWebSocketClient.RT_CURRENT_PRICE,
+                    position.stock_code
+                )
 
             return True
 

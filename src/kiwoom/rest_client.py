@@ -16,10 +16,15 @@ class KiwoomRestClient:
 
     def __init__(self):
         config = load_config("config")
-        self.app_key = config['kiwoom']['app_key']
-        self.app_secret = config['kiwoom']['app_secret']
-        self.account_number = config['kiwoom']['account_number']
-        self.base_url = config['kiwoom']['base_url']
+
+        # 테스트 모드에 따라 올바른 설정 선택
+        test_mode = config.get('trading', {}).get('test_mode', False)
+        kiwoom_config_key = 'kiwoom_test' if test_mode else 'kiwoom'
+
+        self.app_key = config[kiwoom_config_key]['app_key']
+        self.app_secret = config[kiwoom_config_key]['app_secret']
+        self.account_number = config[kiwoom_config_key]['account_number']
+        self.base_url = config[kiwoom_config_key]['base_url']
 
         self.session: Optional[aiohttp.ClientSession] = None
         self.access_token: Optional[str] = None
@@ -31,22 +36,14 @@ class KiwoomRestClient:
         self.max_retries = 3
         self.retry_delay = 3.0  # 3초
 
-        logger.info("키움증권 REST API 클라이언트 초기화")
+        mode_str = "테스트 (Mock API)" if test_mode else "실전 (Real API)"
+        logger.info(f"키움증권 REST API 클라이언트 초기화 - {mode_str}")
 
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
 
-        # 테스트 모드 확인
-        from src.utils.config_loader import load_config
-        config = load_config("config")
-        test_mode = config.get('trading', {}).get('test_mode', False)
-
-        if test_mode:
-            logger.info("🧪 테스트 모드: API 토큰 발급 스킵")
-            self.access_token = "TEST_TOKEN"
-            self.token_expires_at = datetime.now() + timedelta(days=1)
-        else:
-            await self.get_access_token()
+        # API 토큰 발급 (테스트/실전 모두 동일하게 실행)
+        await self.get_access_token()
 
         return self
 
@@ -93,7 +90,8 @@ class KiwoomRestClient:
         # 키움증권 API 표준 헤더
         headers = {
             "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json;charset=UTF-8"
+            "Content-Type": "application/json;charset=UTF-8",
+            "User-Agent": "KiwoomTradingBot/1.0"
         }
 
         # api-id 헤더 추가 (키움증권 필수)
@@ -106,6 +104,19 @@ class KiwoomRestClient:
                 async with self.session.request(
                     method, url, json=data, params=params, headers=headers
                 ) as response:
+                    # Content-Type 확인 (JSON이 아니면 에러 출력)
+                    content_type = response.headers.get('Content-Type', '')
+                    if 'application/json' not in content_type:
+                        response_text = await response.text()
+                        logger.error(
+                            f"❌ Mock API 서버 응답 오류\n"
+                            f"URL: {url}\n"
+                            f"Content-Type: {content_type}\n"
+                            f"Status: {response.status}\n"
+                            f"응답 내용 (처음 500자):\n{response_text[:500]}"
+                        )
+                        raise Exception(f"서버가 JSON 대신 {content_type} 응답 반환")
+
                     result = await response.json()
 
                     # 429 Rate Limit 에러 처리
@@ -155,7 +166,8 @@ class KiwoomRestClient:
 
         headers = {
             "Content-Type": "application/json;charset=UTF-8",
-            "api-id": "au10001"  # 키움증권은 api-id 헤더 필요
+            "api-id": "au10001",  # 키움증권은 api-id 헤더 필요
+            "User-Agent": "KiwoomTradingBot/1.0"  # User-Agent 추가
         }
 
         try:

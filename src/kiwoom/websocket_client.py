@@ -27,7 +27,12 @@ class KiwoomWebSocketClient:
 
     def __init__(self, access_token: str):
         config = load_config("config")
-        self.websocket_url = config['kiwoom']['websocket_url']
+
+        # 테스트 모드에 따라 올바른 WebSocket URL 선택
+        test_mode = config.get('trading', {}).get('test_mode', False)
+        kiwoom_config_key = 'kiwoom_test' if test_mode else 'kiwoom'
+
+        self.websocket_url = config[kiwoom_config_key]['websocket_url']
         self.access_token = access_token
 
         self.websocket: Optional[websockets.WebSocketClientProtocol] = None

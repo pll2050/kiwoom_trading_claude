@@ -51,13 +51,9 @@ class AutoTradingSystem:
                 self.scanner = StockScanner(api_client)
                 self.portfolio = PortfolioManager(self.strategy)
 
-                # WebSocket 초기화 (테스트 모드에서는 스킵 가능)
-                if not self.config['trading']['test_mode']:
-                    self.ws_client = KiwoomWebSocketClient(api_client.access_token)
-                    await self._setup_websocket_handlers()
-                else:
-                    logger.info("🧪 테스트 모드: WebSocket 초기화 스킵")
-                    self.ws_client = None
+                # WebSocket 초기화
+                self.ws_client = KiwoomWebSocketClient(api_client.access_token)
+                await self._setup_websocket_handlers()
 
                 # 계좌 확인
                 await self._check_account()
@@ -119,24 +115,7 @@ class AutoTradingSystem:
         """계좌 상태 확인"""
         logger.info("=== 계좌 확인 ===")
         try:
-            # 테스트 모드: 가상 계좌 데이터 사용
-            if self.config['trading']['test_mode']:
-                logger.info("🧪 테스트 모드: 가상 계좌 데이터 사용")
-                initial_capital = self.config['trading']['initial_capital']
-
-                balance = {'entr': initial_capital}
-                info = {'prsm_dpst_aset_amt': initial_capital}
-                holdings = []
-
-                logger.info(f"예수금: {initial_capital:,}원 (가상)")
-                logger.info(f"총자산: {initial_capital:,}원 (가상)")
-                logger.info(f"보유종목: 0개")
-
-                # 현재 자본금 초기화
-                self.current_capital = initial_capital
-                return
-
-            # 실전 모드: 실제 API 호출
+            # API 호출 (테스트/실전 모두 동일)
             balance = await self.api_client.get_balance()
             info = await self.api_client.get_account_info()
             holdings = await self.api_client.get_holdings()
@@ -265,11 +244,6 @@ class AutoTradingSystem:
                     )
 
                 if buy_recs:
-                    if self.config['trading']['test_mode']:
-                        logger.info("")
-                        logger.info("🧪 테스트 모드: 시뮬레이션 매수 실행")
-                        logger.info("   (실제 API 호출 없이 로그만 출력)")
-                        logger.info("")
                     await self._execute_trades(buy_recs[:5])
 
             except Exception as e:
@@ -315,18 +289,12 @@ class AutoTradingSystem:
                         logger.warning(f"매수 불가 ({name}): {decision['reason']}")
                         continue
 
-                    # 현재가 조회 (테스트 모드에서는 시뮬레이션)
-                    if self.config['trading']['test_mode']:
-                        # 시뮬레이션: AI 분석의 현재가 사용
-                        price = s.get('price', 50000)  # 기본값 50,000원
-                        if price == 0:
-                            price = 50000
-                    else:
-                        quote = await self.api_client.get_quote(code)
-                        price = quote.get('price', 0)
-                        if price == 0:
-                            logger.warning(f"가격 정보 없음: {name}")
-                            continue
+                    # 현재가 조회 (테스트 모드에서도 Mock API 호출)
+                    quote = await self.api_client.get_quote(code)
+                    price = quote.get('price', 0)
+                    if price == 0:
+                        logger.warning(f"가격 정보 없음: {name}")
+                        continue
 
                     # 동적 리스크 관리: 포지션 크기 계산
                     qty = self.risk_manager.calculate_position_size(self.current_capital, price)
@@ -334,28 +302,22 @@ class AutoTradingSystem:
                         logger.warning(f"매수 수량 0: {name}")
                         continue
 
-                    # 주문 실행
-                    if self.config['trading']['test_mode']:
-                        # 시뮬레이션: 주문 성공으로 가정 (API 호출 없음)
-                        pass
-                    else:
-                        await self.api_client.order_buy(code, qty, price)
+                    # 주문 실행 (테스트 모드에서도 Mock API 호출)
+                    await self.api_client.order_buy(code, qty, price)
 
                     investment_amount = price * qty
                     position_pct = (investment_amount / self.current_capital * 100) if self.current_capital > 0 else 0
 
-                    mode_prefix = "[테스트] " if self.config['trading']['test_mode'] else ""
                     logger.info(
-                        f"✅ {mode_prefix}[{risk_decision['mode']}] 매수 주문 성공: {name} {qty}주 @{price:,}원 "
+                        f"✅ [{risk_decision['mode']}] 매수 주문 성공: {name} {qty}주 @{price:,}원 "
                         f"(투자: {investment_amount:,}원, {position_pct:.1f}%)"
                     )
 
                     # 포지션 추가
                     self.strategy.add_position(code, name, qty, price)
 
-                    # 실시간 현재가 구독 (테스트 모드에서는 스킵)
-                    if not self.config['trading']['test_mode']:
-                        await self.ws_client.subscribe_current_price(code)
+                    # 실시간 현재가 구독
+                    await self.ws_client.subscribe_current_price(code)
 
                     # 포지션 수 증가
                     num_positions += 1
@@ -386,63 +348,34 @@ class AutoTradingSystem:
                 logger.info(f"[{datetime.now():%H:%M:%S}] 계좌 조회")
                 logger.info("=" * 60)
 
-                # 테스트 모드: 시뮬레이션 데이터 사용
-                if self.config['trading']['test_mode']:
-                    # 초기 자본금
-                    initial_capital = self.config['trading']['initial_capital']
+                # API 호출 (테스트/실전 모두 동일)
+                balance = await self.api_client.get_balance()
+                entr = int(balance.get('entr', '0'))  # 예수금
+                logger.info(f"💰 예수금: {entr:,}원")
 
-                    # 시뮬레이션 포지션 기반 계산
-                    positions = self.strategy.get_all_positions()
+                # 계좌 정보 조회
+                info = await self.api_client.get_account_info()
+                prsm_dpst_aset_amt = int(info.get('prsm_dpst_aset_amt', '0'))  # 추정예탁자산
 
-                    total_investment = sum(p.get_total_investment() for p in positions)
-                    total_valuation = sum(p.entry_price * p.quantity for p in positions)  # 테스트 모드에서는 현재가 = 매수가
-                    entr = initial_capital - total_investment  # 남은 예수금
-                    prsm_dpst_aset_amt = entr + total_valuation  # 총자산
+                # 현재 총 자산 업데이트
+                self.current_capital = prsm_dpst_aset_amt
+                logger.info(f"📊 총자산: {prsm_dpst_aset_amt:,}원")
 
-                    self.current_capital = prsm_dpst_aset_amt
-
-                    logger.info(f"💰 예수금: {int(entr):,}원 (가상)")
-                    logger.info(f"📊 총자산: {int(prsm_dpst_aset_amt):,}원 (가상)")
-
-                    holdings = positions  # 시뮬레이션 포지션 사용
-                else:
-                    # 실전 모드: 실제 API 호출
-                    balance = await self.api_client.get_balance()
-                    entr = int(balance.get('entr', '0'))  # 예수금
-
-                    logger.info(f"💰 예수금: {entr:,}원")
-
-                    # 계좌 정보 조회
-                    info = await self.api_client.get_account_info()
-                    prsm_dpst_aset_amt = int(info.get('prsm_dpst_aset_amt', '0'))  # 추정예탁자산
-
-                    # 현재 총 자산 업데이트
-                    self.current_capital = prsm_dpst_aset_amt
-
-                    logger.info(f"📊 총자산: {prsm_dpst_aset_amt:,}원")
-
-                    # 보유 종목 조회 및 투자원금 계산
-                    holdings = await self.api_client.get_holdings()
+                # 보유 종목 조회
+                holdings = await self.api_client.get_holdings()
 
                 # 투자원금 = 보유종목의 매수금액 합계
                 total_investment = 0
                 total_valuation = 0
 
-                # 테스트 모드와 실전 모드 처리 구분
-                if self.config['trading']['test_mode']:
-                    # 테스트 모드: Position 객체 사용
-                    for p in holdings:
-                        total_investment += p.get_total_investment()
-                        total_valuation += p.entry_price * p.quantity  # 테스트에서는 현재가 = 매수가
-                else:
-                    # 실전 모드: API 응답 데이터 사용
-                    for h in holdings:
-                        qty = int(h.get('remn_qty', '0'))  # 잔고수량
-                        avg_price = float(h.get('avg_unpr', '0'))  # 평단가
-                        current_price = float(h.get('prsn_rate', avg_price))  # 현재가
+                # API 응답 데이터 사용
+                for h in holdings:
+                    qty = int(h.get('remn_qty', '0'))  # 잔고수량
+                    avg_price = float(h.get('avg_unpr', '0'))  # 평단가
+                    current_price = float(h.get('prsn_rate', avg_price))  # 현재가
 
-                        total_investment += avg_price * qty  # 매수금액
-                        total_valuation += current_price * qty  # 평가금액
+                    total_investment += avg_price * qty  # 매수금액
+                    total_valuation += current_price * qty  # 평가금액
 
                 # 손익 계산
                 total_pnl = total_valuation - total_investment
@@ -469,29 +402,20 @@ class AutoTradingSystem:
                 if holdings:
                     logger.info("-" * 60)
                     for i, h in enumerate(holdings, 1):
-                        if self.config['trading']['test_mode']:
-                            # 테스트 모드: Position 객체
-                            code = h.stock_code
-                            name = h.stock_name
-                            qty = h.quantity
-                            avg_price = h.entry_price
-                            current_price = h.entry_price  # 테스트에서는 현재가 = 매수가
-                        else:
-                            # 실전 모드: API 응답 데이터
-                            code = h.get('sht_cd', '')  # 단축코드
-                            name = h.get('pdno_hngl_nm', '')  # 상품명
-                            qty = int(h.get('remn_qty', '0'))  # 잔고수량
-                            avg_price = float(h.get('avg_unpr', '0'))  # 평단가
-                            current_price = float(h.get('prsn_rate', avg_price))  # 현재가
+                        # API 응답 데이터 사용
+                        code = h.get('sht_cd', '')  # 단축코드
+                        name = h.get('pdno_hngl_nm', '')  # 상품명
+                        qty = int(h.get('remn_qty', '0'))  # 잔고수량
+                        avg_price = float(h.get('avg_unpr', '0'))  # 평단가
+                        current_price = float(h.get('prsn_rate', avg_price))  # 현재가
 
                         investment = avg_price * qty  # 매수금액
                         valuation = current_price * qty  # 평가금액
                         pnl = valuation - investment  # 손익
                         pnl_pct = (pnl / investment * 100) if investment > 0 else 0
 
-                        mode_tag = "[테스트] " if self.config['trading']['test_mode'] else ""
                         logger.info(
-                            f"{mode_tag}{i}. {name}({code}) "
+                            f"{i}. {name}({code}) "
                             f"{qty}주 @{int(avg_price):,}원 → {int(current_price):,}원 | "
                             f"투자: {int(investment):,}원 → 평가: {int(valuation):,}원 "
                             f"({int(pnl):+,}원, {pnl_pct:+.2f}%)"
@@ -540,10 +464,7 @@ class AutoTradingSystem:
                 # 매도 결과 요약
                 if sell_signals:
                     logger.info("=" * 60)
-                    if self.config['trading']['test_mode']:
-                        logger.info(f"🧪 [테스트 모드] 매도 시뮬레이션: {sell_success_count}/{sell_attempt_count}개 성공")
-                    else:
-                        logger.info(f"✅ 매도 완료: {sell_success_count}/{sell_attempt_count}개 성공")
+                    logger.info(f"✅ 매도 완료: {sell_success_count}/{sell_attempt_count}개 성공")
                     if sell_success_count < sell_attempt_count:
                         logger.warning(f"⚠️  매도 실패: {sell_attempt_count - sell_success_count}개")
                     logger.info("=" * 60)
@@ -561,32 +482,26 @@ class AutoTradingSystem:
     async def _execute_sell(self, position: Any, price: float) -> bool:
         """매도 실행"""
         try:
-            # 주문 실행 (테스트 모드에서는 API 호출 없음)
-            if self.config['trading']['test_mode']:
-                # 시뮬레이션: 주문 성공으로 가정
-                pass
-            else:
-                await self.api_client.order_sell(
-                    position.stock_code,
-                    position.quantity,
-                    int(price)
-                )
+            # 주문 실행 (테스트 모드에서도 Mock API 호출)
+            await self.api_client.order_sell(
+                position.stock_code,
+                position.quantity,
+                int(price)
+            )
 
-            mode_prefix = "[테스트] " if self.config['trading']['test_mode'] else ""
             logger.info(
-                f"✅ {mode_prefix}매도 주문 성공: {position.stock_name} "
+                f"✅ 매도 주문 성공: {position.stock_name} "
                 f"{position.quantity}주 @{price:,}원"
             )
 
             # 포지션 제거
             realized_pnl = self.strategy.remove_position(position.stock_code, price)
 
-            # 실시간 구독 해제 (테스트 모드에서는 스킵)
-            if not self.config['trading']['test_mode']:
-                await self.ws_client.unsubscribe(
-                    KiwoomWebSocketClient.RT_CURRENT_PRICE,
-                    position.stock_code
-                )
+            # 실시간 구독 해제
+            await self.ws_client.unsubscribe(
+                KiwoomWebSocketClient.RT_CURRENT_PRICE,
+                position.stock_code
+            )
 
             return True
 

@@ -235,12 +235,17 @@ class AutoTradingSystem:
 
                 for s in buy_recs[:3]:
                     ai = s['ai_analysis']
+                    target_price = ai.get('target_price', 0)
+                    probability = ai.get('probability', 0)
+                    confidence = ai.get('confidence', 0)
+                    reason = ai.get('reason', '정보 없음')
+
                     logger.info(
                         f"  [매수] {s.get('name')} ({s.get('code')})\n"
-                        f"    - 확률: {ai.get('probability')}%\n"
-                        f"    - 목표가: {ai.get('target_price'):,}원\n"
-                        f"    - 신뢰도: {ai.get('confidence'):.2f}\n"
-                        f"    - 이유: {ai.get('reason')}"
+                        f"    - 확률: {probability}%\n"
+                        f"    - 목표가: {target_price:,}원\n"
+                        f"    - 신뢰도: {confidence:.2f}\n"
+                        f"    - 이유: {reason}"
                     )
 
                 if buy_recs:
